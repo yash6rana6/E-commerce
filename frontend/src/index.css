@@ -1,0 +1,28 @@
+@import "tailwindcss";
+/* Dark Mode colors override */
+/* Master Theme Variables */
+:root {
+  --bg-main: #F9F8F3;    /* Light Cream */
+  --text-main: #1C1C1C;  /* Dark Stone */
+  --card-bg: #FFFFFF;
+}
+
+/* Jab dark mode on ho */
+.dark {
+  --bg-main: #0F0F0E !important;  /* Rich Black */
+  --text-main: #F5F5F5 !important;
+  --card-bg: #1A1A19 !important;
+}
+
+/* Puri body pe force apply karo */
+html, body, #root {
+  background-color: var(--bg-main) !important;
+  color: var(--text-main) !important;
+  min-height: 100vh;
+  transition: background-color 0.3s ease;
+}
+
+/* Background gradient ko dark mode mein chupa do agar wo pareshan kar raha hai */
+.dark .bg-[radial-gradient...] {
+    opacity: 0.2;
+}
