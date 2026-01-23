@@ -46,6 +46,8 @@ const storeRefreshToken = async (userId, refreshToken) => {
   }
 };
 
+const isProd = process.env.NODE_ENV === "production";
+
 
 // Set cookies
 const setCookies = (res, accessToken, refreshToken) => {
