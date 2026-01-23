@@ -5,10 +5,12 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-
 const redisAvailable = () => redis && typeof redis.set === "function";
 
+// PROD / DEV detection
+const isProd = process.env.NODE_ENV === "production";
 
+// Generate tokens
 const generateToken = (userId) => {
   const accessToken = jwt.sign(
     { userId },
@@ -25,8 +27,7 @@ const generateToken = (userId) => {
   return { accessToken, refreshToken };
 };
 
-
-// Store Refresh token in Redis (with fallback)
+// Store refresh token in Redis
 const storeRefreshToken = async (userId, refreshToken) => {
   if (!redisAvailable()) {
     console.warn("⚠ Redis unavailable — refresh token not persisted");
@@ -38,7 +39,7 @@ const storeRefreshToken = async (userId, refreshToken) => {
       `refresh_token:${userId}`,
       refreshToken,
       "EX",
-      7 * 24 * 60 * 60 // 7 days
+      7 * 24 * 60 * 60
     );
     console.log(`✅ Refresh token stored for user: ${userId}`);
   } catch (error) {
@@ -46,26 +47,22 @@ const storeRefreshToken = async (userId, refreshToken) => {
   }
 };
 
-const isProd = process.env.NODE_ENV === "production";
-
-
-// Set cookies
+// Cookie setter — prod safe
 const setCookies = (res, accessToken, refreshToken) => {
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProd,
     sameSite: isProd ? "none" : "lax",
     maxAge: 15 * 60 * 1000,
   });
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 };
-
 
 // SIGNUP
 export const signup = async (req, res) => {
@@ -96,7 +93,6 @@ export const signup = async (req, res) => {
   }
 };
 
-
 // LOGIN
 export const login = async (req, res) => {
   try {
@@ -125,7 +121,6 @@ export const login = async (req, res) => {
   }
 };
 
-
 // LOGOUT
 export const logout = async (req, res) => {
   try {
@@ -134,7 +129,6 @@ export const logout = async (req, res) => {
     if (refreshToken) {
       try {
         const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-
         if (redisAvailable()) {
           await redis.del(`refresh_token:${decoded.userId}`);
         }
@@ -143,8 +137,17 @@ export const logout = async (req, res) => {
       }
     }
 
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+    });
+
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+    });
 
     res.json({ message: "Logged out successfully" });
 
@@ -153,8 +156,7 @@ export const logout = async (req, res) => {
   }
 };
 
-
-// REFRESH ACCESS TOKEN
+// REFRESH TOKEN
 export const refreshToken = async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
@@ -175,8 +177,6 @@ export const refreshToken = async (req, res) => {
       if (stored !== refreshToken) {
         return res.status(401).json({ message: "Invalid refresh token" });
       }
-    } else {
-      console.warn("⚠ Redis down — skipping refresh token validation (fallback)");
     }
 
     const newAccessToken = jwt.sign(
@@ -187,8 +187,8 @@ export const refreshToken = async (req, res) => {
 
     res.cookie("accessToken", newAccessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
       maxAge: 15 * 60 * 1000,
     });
 
@@ -198,7 +198,6 @@ export const refreshToken = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
 
 // PROFILE
 export const getProfile = async (req, res) => {
